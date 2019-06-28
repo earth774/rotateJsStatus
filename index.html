@@ -1,0 +1,123 @@
+<!-- 20190614_121736.jpg -->
+<!-- https://sv1.picz.in.th/images/2019/06/17/1iaSRb.jpg -->
+<img id="image1" src="https://sv1.picz.in.th/images/2019/06/17/1iaSRb.jpg">
+<input id='input' type='file' />
+<br />
+<script>
+
+
+    // usage:
+    var input = document.getElementById('input');
+    let image1 = document.getElementById('image1');
+    input.onchange = function (e) {
+
+        checkImageRotation(input.files[0], async (orientation) => {
+            let data = await getBase64(input.files[0], orientation);
+            console.log(data);
+        });
+
+    }
+
+    function getBase64(file, type) {
+        return new Promise((resolve, reject) => {
+            var reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async () => {
+                if (type !== 8 && type !== 6) {
+                    resolve(reader.result);
+                    image1.src = reader.result;
+                } else {
+                    let rotate = (type === 8) ? -90 : 90;
+                    console.log(reader.result);
+                    let data = await rotateBase64Image(reader.result, rotate, type);
+                    image1.src = data;
+                    resolve(data);
+                }
+
+            };
+            reader.onerror = function (error) {
+                console.log('Error: ', error);
+            };
+        });
+    }
+
+
+
+    function rotateBase64Image(base64data, rotate, type) {
+        return new Promise((resolve, reject) => {
+            var image = new Image();
+            image.setAttribute('crossorigin', 'anonymous');
+            image.onload = function () {
+                let canvas = document.createElement("canvas");
+                let ctx = canvas.getContext('2d');
+                ctx.canvas.width = image.height / 2;
+                ctx.canvas.height = image.width / 2;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.save();
+                ctx.translate(canvas.width, canvas.height);
+                ctx.rotate(rotate * Math.PI / 180);
+                if (type === 8) {
+                    ctx.drawImage(image, 0, -image.height / 2, image.width / 2, image.height / 2);
+                } else if (type === 6) {
+                    ctx.drawImage(image, -image.width / 2, 0, image.width / 2, image.height / 2);
+                }
+                ctx.restore();
+                resolve(canvas.toDataURL());
+            };
+            image.src = base64data;
+        });
+    }
+
+    function checkImageRotation(file, callback) {
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            var view = new DataView(e.target.result);
+            if (view.getUint16(0, false) != 0xFFD8) {
+                return callback(-2);
+            }
+            var length = view.byteLength, offset = 2;
+            while (offset < length) {
+                if (view.getUint16(offset + 2, false) <= 8) return callback(-1);
+                var marker = view.getUint16(offset, false);
+                offset += 2;
+                if (marker == 0xFFE1) {
+                    if (view.getUint32(offset += 2, false) != 0x45786966) {
+                        return callback(-1);
+                    }
+
+                    var little = view.getUint16(offset += 6, false) == 0x4949;
+                    offset += view.getUint32(offset + 4, little);
+                    var tags = view.getUint16(offset, little);
+                    offset += 2;
+                    for (var i = 0; i < tags; i++) {
+                        if (view.getUint16(offset + (i * 12), little) == 0x0112) {
+                            return callback(view.getUint16(offset + (i * 12) + 8, little));
+                        }
+                    }
+                }
+                else if ((marker & 0xFF00) != 0xFF00) {
+                    break;
+                }
+                else {
+                    offset += view.getUint16(offset, false);
+                }
+            }
+            return callback(-1);
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+
+
+</script>
+
+<style>
+    .image_type_8 {
+        width: 250px;
+        -ms-transform: rotate(270deg);
+        /* IE 9 */
+        -webkit-transform: rotate(270deg);
+        /* Safari 3-8 */
+        transform: rotate(270deg);
+    }
+</style>
